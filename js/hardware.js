@@ -316,11 +316,14 @@ const checkSupport = () => {
   const brightnessCommand = !!HARDWARE.display.brightness.command && !!HARDWARE.display.brightness.value.max;
   const keyboardProcess = processRuns("squeekboard");
 
+  const hasBrightness = brightnessPath && brightnessCommand;
+
   return {
     batteryLevel: batteryPath,
     illuminanceLevel: illuminancePath,
-    displayStatus: statusPath && statusCommand,
-    displayBrightness: statusPath && statusCommand && brightnessPath && brightnessCommand,
+    // Without a status command (e.g. cage) brightness via sysfs still works, so assume the display is on
+    displayStatus: (statusPath && statusCommand) || hasBrightness,
+    displayBrightness: hasBrightness,
     keyboardVisibility: keyboardProcess,
     audioVolume: audioOutput,
     microphoneVolume: audioInput,
@@ -704,6 +707,10 @@ const getDisplayStatus = () => {
       }
       break;
   }
+  // If no status command but brightness is supported, assume display is on
+  if (HARDWARE.support.displayBrightness) {
+    return "ON";
+  }
   return null;
 };
 
@@ -743,6 +750,10 @@ const setDisplayStatus = (status, callback = null) => {
       break;
     case "xset":
       execAsyncCommand("xset", ["dpms", "force", status.toLowerCase()], callback);
+      break;
+    default:
+      // No display status command available, just call callback
+      if (typeof callback === "function") callback(null, null);
       break;
   }
 };
